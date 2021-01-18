@@ -36,10 +36,14 @@ option(GenerateDarwinFramework "Build darwin framework library" ON)
 
 option(Plugin.SymbolResolver "Resolve symbol by [DobbySymbolResolver] " ON)
 
+option(Plugin.GlobalOffsetTableHook "Global Offset Table Hook by [DobbyGlobalOffsetTableReplace] " ON)
+
 option(Plugin.LinkerLoadCallback "Register image load callback " OFF)
 
 # frida is better choice
 option(Plugin.ApplicationEventMonitor "Auto monitor linker, file, etc." OFF)
+
+option(Plugin.Android.BionicLinkerRestriction "Enable android bionic linker restriction" OFF)
 
 option(Plugin.Darwin.HideLibrary "Hide library by [DobbyHideLibrary]" OFF)
 
@@ -283,6 +287,17 @@ set(dobby.HEADER_FILE_LIST
   include/dobby.h
   )
 
+if(Plugin.GlobalOffsetTableHook)
+  include_directories(builtin-plugin/GlobalOffsetTableHook)
+
+  message(STATUS "[Dobby] Enable Global offset table hook")
+  if(SYSTEM.Darwin)
+    set(dobby.plugin.SOURCE_FILE_LIST ${dobby.plugin.SOURCE_FILE_LIST}
+      builtin-plugin/GlobalOffsetTableHook/global_offset_table_hook.cc
+    )
+  endif()
+endif()
+
 if(Plugin.SymbolResolver)
   include_directories(builtin-plugin/SymbolResolver)
 
@@ -296,7 +311,6 @@ if(Plugin.SymbolResolver)
   if(SYSTEM.Linux OR SYSTEM.Android)
     set(dobby.plugin.SOURCE_FILE_LIST ${dobby.plugin.SOURCE_FILE_LIST}
       builtin-plugin/SymbolResolver/elf/dobby_symbol_resolver.cc
-      builtin-plugin/AndroidRestriction/android_restriction.cc
     )
   endif()
 endif()
@@ -319,6 +333,16 @@ if(Plugin.Darwin.ObjectiveC)
   set(dobby.plugin.SOURCE_FILE_LIST ${dobby.plugin.SOURCE_FILE_LIST}
     external/helpers/variable_cache.c
     builtin-plugin/ObjectiveC/objective_c_tookit.mm
+  )
+endif()
+
+if(Plugin.Android.BionicLinkerRestriction)
+  if(NOT SYSTEM.Android)
+    message(FATAL_ERROR "[!] Plugin.Android.BionicLinkerRestriction only works on Android.")
+  endif()
+  message(STATUS "[Dobby] Enable Plugin.Android.BionicLinkerRestriction")
+  set(dobby.plugin.SOURCE_FILE_LIST ${dobby.plugin.SOURCE_FILE_LIST}
+    builtin-plugin/BionicLinkerRestriction/bionic_linker_restriction.cc
   )
 endif()
 
@@ -406,6 +430,10 @@ endif()
 
 if(SYSTEM.Android)
   target_link_libraries(dobby log)
+endif()
+
+if(SYSTEM.Linux)
+  target_link_libraries(dobby dl)
 endif()
 
 if(SYSTEM.Darwin)

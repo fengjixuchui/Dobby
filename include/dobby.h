@@ -24,7 +24,7 @@ typedef enum {
 } MemoryOperationError;
 
 #define PLATFORM_INTERFACE_CODE_PATCH_TOOL_H
-MemoryOperationError CodePatch(void *address, void *buffer, int size);
+MemoryOperationError CodePatch(void *address, uint8_t *buffer, uint32_t buffer_size);
 
 typedef uintptr_t addr_t;
 typedef uint32_t  addr32_t;
@@ -170,6 +170,9 @@ int DobbyDestroy(void *address);
 
 // iterate symbol table and find symbol
 void *DobbySymbolResolver(const char *image_name, const char *symbol_name);
+
+// global offset table
+int DobbyGlobalOffsetTableReplace(char *image_name, char *symbol_name, void *fake_func, void **orig_func);
 
 // [!!! READ ME !!!]
 // for arm, Arm64, dobby will use b xxx instead of ldr absolute indirect branch
