@@ -45,10 +45,6 @@ option(Plugin.ApplicationEventMonitor "Auto monitor linker, file, etc." OFF)
 
 option(Plugin.Android.BionicLinkerRestriction "Enable android bionic linker restriction" OFF)
 
-option(Plugin.Darwin.HideLibrary "Hide library by [DobbyHideLibrary]" OFF)
-
-option(Plugin.Darwin.ObjectiveC "Auto hook oc method library by [DobbyOCReturnConstant]" OFF)
-
 # Use native assembly bridge to replace the runtime codegen
 # if(CLOSURE_BRIDGE_TEMPLATE)
 #   SET(CMAKE_ASM_FLAGS "${CMAKE_C_FLAGS}")
@@ -86,6 +82,7 @@ if(SYSTEM.Darwin)
     set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,-exported_symbol,_dobby_enable_near_branch_trampoline -Wl,-exported_symbol,_dobby_disable_near_branch_trampoline")
   endif()
 elseif(SYSTEM.Android)
+  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fomit-frame-pointer")
   if(NOT DOBBY_DEBUG)
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -ffunction-sections -fdata-sections")
     set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,--gc-sections -Wl,--exclude-libs,ALL")
@@ -262,6 +259,8 @@ if(NearBranch)
     source/MemoryAllocator/NearMemoryArena.cc)
 endif()
 
+add_subdirectory(external/external_helper)
+
 # add logging library
 # add_subdirectory(external/logging)
 set(logging.SOURCE_FILE_LIST
@@ -315,27 +314,6 @@ if(Plugin.SymbolResolver)
   endif()
 endif()
 
-if(Plugin.Darwin.HideLibrary)
-  if(NOT SYSTEM.Darwin)
-    message(FATAL_ERROR "[!] Plugin.Darwin.HideLibrary only works on Darwin.")
-  endif()
-  message(STATUS "[Dobby] Enable Plugin.Darwin.HideLibrary")
-  set(dobby.plugin.SOURCE_FILE_LIST ${dobby.plugin.SOURCE_FILE_LIST}
-    builtin-plugin/HideLibrary/hide_library_darwin.cc
-  )
-endif()
-
-if(Plugin.Darwin.ObjectiveC)
-  if(NOT SYSTEM.Darwin)
-    message(FATAL_ERROR "[!] Plugin.Darwin.ObjectiveC only works on Darwin.")
-  endif()
-  message(STATUS "[Dobby] Enable Plugin.Darwin.ObjectiveC")
-  set(dobby.plugin.SOURCE_FILE_LIST ${dobby.plugin.SOURCE_FILE_LIST}
-    external/helpers/variable_cache.c
-    builtin-plugin/ObjectiveC/objective_c_tookit.mm
-  )
-endif()
-
 if(Plugin.Android.BionicLinkerRestriction)
   if(NOT SYSTEM.Android)
     message(FATAL_ERROR "[!] Plugin.Android.BionicLinkerRestriction only works on Android.")
@@ -370,10 +348,6 @@ include_directories(
   ./external/xnucxx
 
   builtin-plugin
-  builtin-plugin/AndroidRestriction
-  builtin-plugin/SymbolResolver
-  builtin-plugin/HideLibrary
-  builtin-plugin/ObjectiveC
 )
 
 # add build version
@@ -391,17 +365,21 @@ if (EXISTS "${CMAKE_SOURCE_DIR}/.git")
   endif()
 endif()
 set(DOBBY_BUILD_VERSION "Dobby${VERSION_REVISION}")
-message(STATUS "Version: ${DOBBY_BUILD_VERSION}")
 add_definitions(-D__DOBBY_BUILD_VERSION__="${DOBBY_BUILD_VERSION}")
+message(STATUS "[Dobby] ${DOBBY_BUILD_VERSION}")
 
+# upper framework output name
 set(dobby_output_name dobby)
 if(SYSTEM.Darwin AND GenerateDarwinFramework)
+  message(STATUS "[Dobby] Generate darwin framework")
   set(dobby_output_name Dobby)
 endif()
 
 if(DOBBY_GENERATE_SHARED)
+  message(STATUS "[Dobby] Generate shared library")
   add_library(${dobby_output_name} SHARED ${dobby.HEADER_FILE_LIST} ${dobby.SOURCE_FILE_LIST} ${logging.SOURCE_FILE_LIST} ${xnucxx.SOURCE_FILE_LIST} ${dobby.plugin.SOURCE_FILE_LIST})
 else()
+  message(STATUS "[Dobby] Generate static library")
   add_library(${dobby_output_name} STATIC ${dobby.HEADER_FILE_LIST} ${dobby.SOURCE_FILE_LIST} ${logging.SOURCE_FILE_LIST} ${xnucxx.SOURCE_FILE_LIST} ${dobby.plugin.SOURCE_FILE_LIST})
 endif()
 
@@ -441,8 +419,10 @@ if(SYSTEM.Darwin)
     "-framework Foundation")
 endif()
 
-if(Plugin.SupervisorCallMonitor)
+if(SYSTEM.Darwin)
+  add_subdirectory(builtin-plugin/Dyld2HideLibrary)
   add_subdirectory(builtin-plugin/SupervisorCallMonitor)
+  add_subdirectory(builtin-plugin/ObjcRuntimeHook)
 endif()
 
-# add_subdirectory(example)
+add_subdirectory(example)

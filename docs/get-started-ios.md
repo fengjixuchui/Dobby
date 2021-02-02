@@ -2,12 +2,6 @@
 
 available build option within iOS:
 
-```
-Plugin.Darwin.HideLibrary=ON, enable the hidden library plugin
-
-Plugin.Darwin.ObjectiveC=ON, enable the objective-c toolkit
-```
-
 ## add Dobby.framework to your project
 
 ```
@@ -15,7 +9,7 @@ cmake .. -G Xcode \
 -DCMAKE_TOOLCHAIN_FILE=cmake/ios.toolchain.cmake \
 -DPLATFORM=OS64 -DARCHS="arm64" -DCMAKE_SYSTEM_PROCESSOR=arm64 \
 -DENABLE_BITCODE=0 -DENABLE_ARC=0 -DENABLE_VISIBILITY=1 -DDEPLOYMENT_TARGET=9.3 \
--DDynamicBinaryInstrument=ON -DNearBranch=ON -DPlugin.SymbolResolver=ON -DPlugin.Darwin.HideLibrary=ON -DPlugin.Darwin.ObjectiveC=ON
+-DDOBBY_GENERATE_SHARED=OFF -DGenerateDarwinFramework=ON
 
 ```
 
@@ -43,10 +37,6 @@ DobbyHook((void *)posix_spawn_ptr, (void *)fake_posix_spawn_ptr, (void **)&orig_
 *(void **)&orig_posix_spawn = (void *)ptrauth_sign_unauthenticated((void *)orig_posix_spawn, ptrauth_key_asia, 0);
 ```
 
-
-## hide your library
-
-invoke `DobbyHideLibrary("Dobby");` will delete the image record in the `dyld::allimageinfos`
 
 ## objective-c toolkit
 
