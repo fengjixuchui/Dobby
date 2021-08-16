@@ -1,25 +1,29 @@
-
-#ifndef MemoryAllocator_NearMemoryArena_h
-#define MemoryAllocator_NearMemoryArena_h
+#pragma once
 
 #include "MemoryAllocator/MemoryArena.h"
 
+#include "common_header.h"
+
 class NearMemoryArena : public MemoryArena {
 public:
-  NearMemoryArena();
+  static NearMemoryArena *SharedInstance() {
+    static NearMemoryArena *arena_priv_ = nullptr;
+    if (arena_priv_ == nullptr) {
+      arena_priv_ = new NearMemoryArena();
+    }
+    return arena_priv_;
+  }
 
-  static MemoryChunk *AllocateChunk(addr_t position, size_t alloc_range, int alloc_size, MemoryPermission permission);
+  MemBlock *allocNearBlock(size_t alloc_size, addr_t pos, size_t alloc_range, bool executable);
 
-  static WritableDataChunk *AllocateDataChunk(addr_t position, size_t alloc_range, int alloc_size);
+  DataBlock *allocNearDataBlock(size_t alloc_size, addr_t pos, size_t alloc_range) {
+    return allocNearBlock(alloc_size, pos, alloc_range, false);
+  }
 
-  static AssemblyCodeChunk *AllocateCodeChunk(addr_t position, size_t alloc_range, int alloc_size);
+  CodeBlock *allocNearCodeBlock(size_t alloc_size, addr_t pos, size_t alloc_range) {
+    return allocNearBlock(alloc_size, pos, alloc_range, true);
+  }
 
-  static int PushPage(addr_t page_addr, MemoryPermission permission);
-
-  static void Destroy(MemoryChunk *chunk);
-
-private:
-  static LiteMutableArray *page_chunks;
+  std::vector<MemChunk *> data_chunks_;
+  std::vector<MemChunk *> code_chunks_;
 };
-
-#endif

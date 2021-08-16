@@ -3,47 +3,33 @@
 #include "dobby_internal.h"
 #include "PlatformUnifiedInterface/ExecMemory/CodePatchTool.h"
 
-AssemblyCodeChunk *AssemblyCodeBuilder::FinalizeFromAddress(addr_t address, int size) {
-  AssemblyCodeChunk *result = NULL;
-  result                    = new AssemblyCodeChunk;
-  result->init_region_range(address, size);
-  return result;
-}
+AssemblyCode *AssemblyCodeBuilder::FinalizeFromTurboAssembler(AssemblerBase *assembler) {
+  CodeBufferBase *buffer = nullptr;
+  buffer = (CodeBufferBase *)assembler->GetCodeBuffer();
 
-AssemblyCodeChunk *AssemblyCodeBuilder::FinalizeFromTurboAssembler(AssemblerBase *assembler) {
-  CodeBufferBase *codeBuffer = reinterpret_cast<CodeBufferBase *>(assembler->GetCodeBuffer());
-
-  void *address = assembler->RealizeAddress();
-  if (!address) {
-
+  void *realized_addr = assembler->GetRealizedAddress();
+  if (realized_addr == nullptr) {
     int buffer_size = 0;
     {
-      buffer_size = codeBuffer->getSize();
-#if TARGET_ARCH_ARM64 || TARGET_ARCH_ARM
-      // FIXME: need it ? actually ???
+      buffer_size = buffer->GetBufferSize();
+#if TARGET_ARCH_ARM
       // extra bytes for align needed
       buffer_size += 4;
 #endif
     }
 
-    // assembler without specific memory address
-    AssemblyCodeChunk *cchunk;
-    cchunk = MemoryArena::AllocateCodeChunk(buffer_size);
-    if (cchunk == nullptr)
+    auto *block = CodeMemoryArena::SharedInstance()->allocCodeBlock(buffer_size);
+    if (block == nullptr)
       return nullptr;
 
-    address = cchunk->address;
-    assembler->CommitRealizeAddress(cchunk->address);
-    delete cchunk;
+    realized_addr = (void *)block->addr;
+    assembler->SetRealizedAddress(realized_addr);
   }
 
-  // Realize(Relocate) the buffer_code to the executable_memory_address, remove the ExternalLabels, etc, the pc-relative
+  // Realize the buffer code to the executable memory address, remove the ExternalLabel, etc, the pc-relative
   // instructions
-  CodePatch(address, (uint8_t *)codeBuffer->getRawBuffer(), codeBuffer->getSize());
+  CodePatch(realized_addr, buffer->GetBuffer(), buffer->GetBufferSize());
 
-  AssemblyCodeChunk *result = NULL;
-  result                    = FinalizeFromAddress((addr_t)address, codeBuffer->getSize());
-  DLOG(0, "[assembler] Finalize assembler at %p", (void *)address);
-
-  return result;
+  AssemblyCode *code = new AssemblyCode{.begin = realized_addr, .size = buffer->GetBufferSize()};
+  return code;
 }

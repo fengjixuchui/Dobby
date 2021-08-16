@@ -1,10 +1,10 @@
-#include "common/macros/platform_macro.h"
+#include "platform_macro.h"
 #if defined(TARGET_ARCH_IA32)
 
 #include "MemoryAllocator/CodeBuffer/code-buffer-x86.h"
 
 void CodeBuffer::Emit32(int32_t data) {
-  ensureCapacity(getSize() + sizeof(int32_t));
+  ensureCapacity(GetBufferSize() + sizeof(int32_t));
   *reinterpret_cast<int32_t *>(getCursor()) = data;
   buffer_cursor += sizeof(int32_t);
   return;

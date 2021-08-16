@@ -2,72 +2,36 @@
 
 #include "dobby_internal.h"
 
-LiteMutableArray *MemoryArena::page_chunks = NULL;
-
-void MemoryArena::Destroy(AssemblyCodeChunk *cchunk) {
-  return;
-}
-
-MemoryChunk *MemoryArena::AllocateChunk(int alloc_size, MemoryPermission permission) {
-  MemoryChunk *result = NULL;
-
-  if (page_chunks == NULL) {
-    page_chunks = new LiteMutableArray(8);
-  }
-
-  LiteCollectionIterator iter(page_chunks);
-  PageChunk *            page = NULL;
-  while ((page = reinterpret_cast<PageChunk *>(iter.getNextObject())) != NULL) {
-    if (page->permission == permission) {
-      // check the page remain space is enough for the new chunk
-      if ((page->page_cursor + alloc_size) < ((addr_t)page->page.address + page->page.length)) {
-        break;
-      }
-    }
-  }
-
-  // alloc a new executable page.
-  if (!page) {
-    int   pageSize    = OSMemory::PageSize();
-    void *pageAddress = OSMemory::Allocate(NULL, pageSize, permission);
-    if (pageAddress == NULL) {
-      ERROR_LOG("Failed to alloc page");
-      return NULL;
+MemBlock * MemoryArena::allocBlock(size_t alloc_size) {
+    MemBlock *result;
+    for (auto *chunk : chunks_) {
+      result = chunk->allocBlock(alloc_size);
+      if(result)
+        return result;
     }
 
-    PageChunk *newPage    = new PageChunk;
-    newPage->page.address = pageAddress;
-    newPage->page.length  = pageSize;
-    newPage->page_cursor  = (addr_t)pageAddress;
-    newPage->permission   = permission;
-    newPage->chunks       = new LiteMutableArray(8);
-    MemoryArena::page_chunks->pushObject(reinterpret_cast<LiteObject *>(newPage));
-    page = newPage;
-  }
-
-  MemoryChunk *chunk = NULL;
-  if (page) {
-    chunk          = new MemoryChunk;
-    chunk->address = (void *)page->page_cursor;
-    chunk->length  = alloc_size;
-
-    // update page cursor
-    page->chunks->pushObject(reinterpret_cast<LiteObject *>(chunk));
-    page->page_cursor += alloc_size;
-  }
-
-  result = chunk;
+  MemChunk *new_chunk = allocChunk(alloc_size);
+  result = new_chunk->allocBlock(alloc_size);
   return result;
 }
 
-AssemblyCodeChunk *MemoryArena::AllocateCodeChunk(int alloc_size) {
-  return MemoryArena::AllocateChunk(alloc_size, kReadExecute);
+MemChunk * MemoryArena::allocChunk(size_t alloc_size) {
+  size_t chunk_size = ALIGN_CEIL(alloc_size, OSMemory::PageSize());
+  addr_t chunk_addr = (addr_t)OSMemory::Allocate(chunk_size, kNoAccess);
+
+  MemChunk *chunk = new MemChunk{.addr = chunk_addr, .cursor_addr = chunk_addr, .size = chunk_size};
+  chunks_.push_back(chunk);
+  return chunk;
 }
 
-WritableDataChunk *MemoryArena::AllocateDataChunk(int alloc_size) {
-  return MemoryArena::AllocateChunk(alloc_size, kReadWrite);
+MemChunk * CodeMemoryArena::allocChunk(size_t alloc_size) {
+  MemChunk *chunk = MemoryArena::allocChunk(alloc_size);
+  OSMemory::SetPermission((void *)chunk->addr, chunk->size, kReadExecute);
+  return chunk;
 }
 
-// UserMode
-// Search code cave from MemoryLayout
-// MemoryRegion *CodeChunk::SearchCodeCave(uword pos, uword alloc_range, size_t size) {}
+MemChunk * DataMemoryArena::allocChunk(size_t alloc_size) {
+  MemChunk *chunk = MemoryArena::allocChunk(alloc_size);
+  OSMemory::SetPermission((void *)chunk->addr, chunk->size, kReadWrite);
+  return chunk;
+}

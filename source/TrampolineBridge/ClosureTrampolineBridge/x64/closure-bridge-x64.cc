@@ -1,11 +1,11 @@
-#include "common/macros/platform_macro.h"
+#include "platform_macro.h"
 #if defined(TARGET_ARCH_X64)
 
 #include "dobby_internal.h"
 
-#include "core/modules/assembler/assembler-x64.h"
+#include "core/assembler/assembler-x64.h"
 
-#include "TrampolineBridge/ClosureTrampolineBridge/closure-trampoline-common-handler.h"
+#include "TrampolineBridge/ClosureTrampolineBridge/common-bridge-handler.h"
 
 using namespace zz;
 using namespace zz::x64;
@@ -26,11 +26,11 @@ void *get_closure_bridge() {
 #else
 
 // otherwise, use the Assembler build the closure_bridge
-#define _  turbo_assembler_.
+#define _ turbo_assembler_.
 #define __ turbo_assembler_.GetCodeBuffer()->
 
-  char *pushfq = (char *)"\x9c";
-  char *popfq = (char *)"\x9d";
+  uint8_t *pushfq = (uint8_t *)"\x9c";
+  uint8_t *popfq = (uint8_t *)"\x9d";
 
   TurboAssembler turbo_assembler_(0);
 
@@ -75,27 +75,27 @@ void *get_closure_bridge() {
   // [!!!] As we can't detect the sp is aligned or not, check if need stack align
   {
     //  mov rax, rsp
-    __ EmitBuffer((void *)"\x48\x89\xE0", 3);
+    __ EmitBuffer((uint8_t *)"\x48\x89\xE0", 3);
     //  and rax, 0xF
-    __ EmitBuffer((void *)"\x48\x83\xE0\x0F", 4);
+    __ EmitBuffer((uint8_t *)"\x48\x83\xE0\x0F", 4);
     //  cmp rax, 0x0
-    __ EmitBuffer((void *)"\x48\x83\xF8\x00", 4);
+    __ EmitBuffer((uint8_t *)"\x48\x83\xF8\x00", 4);
     // jnz [stack_align_call_bridge]
-    __ EmitBuffer((void *)"\x75\x15", 2);
+    __ EmitBuffer((uint8_t *)"\x75\x15", 2);
   }
 
   // LABEL: call_bridge
   _ CallFunction(ExternalReference((void *)intercept_routing_common_bridge_handler));
 
   // jmp [restore_stack_register]
-  __ EmitBuffer((void *)"\xE9\x12\x00\x00\x00", 5);
+  __ EmitBuffer((uint8_t *)"\xE9\x12\x00\x00\x00", 5);
 
   // LABEL: stack_align_call_bridge
   // push rax
-  __ EmitBuffer((void *)"\x50", 1);
+  __ EmitBuffer((uint8_t *)"\x50", 1);
   _ CallFunction(ExternalReference((void *)intercept_routing_common_bridge_handler));
   // pop rax
-  __ EmitBuffer((void *)"\x58", 1);
+  __ EmitBuffer((uint8_t *)"\x58", 1);
 
   // ======= RegisterContext Restore =======
 
@@ -130,10 +130,11 @@ void *get_closure_bridge() {
 
   _ RelocBind();
 
-  AssemblyCodeChunk *code = AssemblyCodeBuilder::FinalizeFromTurboAssembler(&turbo_assembler_);
-  closure_bridge = (void *)code->raw_instruction_start();
+  AssemblyCode *code = nullptr;
+  code = AssemblyCodeBuilder::FinalizeFromTurboAssembler(&turbo_assembler_);
+  closure_bridge = code->begin;
 
-  DLOG(1, "[closure bridge] Build the closure bridge at %p", closure_bridge);
+  DLOG(0, "[closure bridge] closure bridge at %p", closure_bridge);
 #endif
   return (void *)closure_bridge;
 }

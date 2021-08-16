@@ -3,35 +3,35 @@
 
 #include "dobby_internal.h"
 
-typedef struct _InterceptorOptions {
-  // enable near branch
-  bool enable_near_branch_trampoline;
+#include "include/list_structure.h"
 
-} InterceptorOptions;
+typedef struct {
+  struct list_head list_node;
+  HookEntry *entry;
+} HookEntryNode;
 
 class Interceptor {
 public:
   static Interceptor *SharedInstance();
 
-  const InterceptorOptions &options() const {
-    return options_;
-  }
-
   HookEntry *FindHookEntry(void *address);
 
   void AddHookEntry(HookEntry *entry);
+
+  void RemoveHookEntry(void *address);
+
+  int GetHookEntryCount();
 
 private:
   Interceptor() {
   }
 
-public:
-  LiteMutableArray *entries;
+  HookEntryNode *find_hook_entry_node(void *address);
 
 private:
-  static Interceptor *priv_interceptor_;
+  struct list_head hook_entry_list_;
 
-  static InterceptorOptions options_;
+  static Interceptor *priv_interceptor_;
 };
 
 #endif

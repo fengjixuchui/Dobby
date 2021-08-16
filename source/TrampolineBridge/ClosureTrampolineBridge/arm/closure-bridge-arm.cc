@@ -1,11 +1,11 @@
-#include "common/macros/platform_macro.h"
+#include "platform_macro.h"
 #if defined(TARGET_ARCH_ARM)
 
 #include "dobby_internal.h"
 
-#include "core/modules/assembler/assembler-arm.h"
+#include "core/assembler/assembler-arm.h"
 
-#include "TrampolineBridge/ClosureTrampolineBridge/closure-trampoline-common-handler.h"
+#include "TrampolineBridge/ClosureTrampolineBridge/common-bridge-handler.h"
 
 using namespace zz;
 using namespace zz::arm;
@@ -79,10 +79,10 @@ void *get_closure_bridge() {
   // auto switch A32 & T32 with `least significant bit`, refer `docs/A32_T32_states_switch.md`
   _ mov(pc, Operand(r12));
 
-  AssemblyCodeChunk *code = AssemblyCodeBuilder::FinalizeFromTurboAssembler(&turbo_assembler_);
-  closure_bridge          = (void *)code->raw_instruction_start();
+  AssemblyCode *code = AssemblyCodeBuilder::FinalizeFromTurboAssembler(&turbo_assembler_);
+  closure_bridge = code->address;
 
-  DLOG(1, "[closure bridge] Build the closure bridge at %p", closure_bridge);
+  DLOG(0, "[closure bridge] closure bridge at %p", closure_bridge);
 #endif
   return (void *)closure_bridge;
 }
